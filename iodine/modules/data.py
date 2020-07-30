@@ -22,6 +22,7 @@ from multi_object_datasets import (
     multi_dsprites,
     tetrominoes,
     objects_room,
+    dots
 )
 from shapeguard import ShapeGuard
 import sonnet as snt
@@ -261,4 +262,53 @@ class Tetrominoes(IODINEDataset):
         "color": sg.guard(ensure_3d(data["color"]), "B, L, 3"),
         "shape": sg.guard(ensure_3d(data["shape"]), "B, L, 1"),
         "position": sg.guard(ensure_3d(position), "B, L, 2"),
+    }
+
+class Dots(IODINEDataset):
+  num_true_objects = 6
+  num_channels = 3
+  factors = {
+  }
+
+  def __init__(self, path, image_dim=(64, 64), name="dots", **kwargs):
+    super().__init__(path=path, name=name, image_dim=image_dim, **kwargs)
+    self.dataset = dots.dataset(self.path)
+  
+  def preprocess(self, data):
+    sg = ShapeGuard(dims={
+        "B": self.batch_size,
+        "H": self.image_dim[0],
+        "W": self.image_dim[1]
+    })
+    image = sg.guard(data["image"], "B, h, w, C")
+
+    # to float
+    image = tf.cast(image, tf.float32) / 255.0
+
+    # crop
+    if self.crop_region is not None:
+      height_slice = slice(self.crop_region[0][0], self.crop_region[0][1])
+      width_slice = slice(self.crop_region[1][0], self.crop_region[1][1])
+      image = image[:, height_slice, width_slice, :]
+
+      mask = mask[:, :, height_slice, width_slice, :]
+
+    # rescale
+    size = tf.constant(
+        self.image_dim, dtype=tf.int32, shape=[2], verify_shape=True)
+    image = tf.image.resize_images(
+        image, size, method=tf.image.ResizeMethod.BILINEAR)
+
+    if self.grayscale:
+      image = tf.reduce_mean(image, axis=-1, keepdims=True)
+
+    output = {
+        "image": sg.guard(image[:, None], "B, T, H, W, C"),
+    }
+
+    return output
+
+  def preprocess_factors(self, data, sg):
+
+    return {
     }

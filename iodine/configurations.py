@@ -368,3 +368,108 @@ def tetrominoes():
       },
       "beta1": 0.95,
   }
+
+
+def dots():
+  n_z = 32  # number of latent dimensions
+  num_components = 6  # number of components (K)
+  num_iters = 5
+  checkpoint_dir = "iodine/checkpoints/dots"
+
+  # For the paper we used 8 GPUs with a batch size of 32 each.
+  # This means a total batch size of 256, which is too large for a single GPU.
+  # When reducing the batch size, the learning rate should also be lowered.
+  batch_size = 128
+  learn_rate = 0.0003 * math.sqrt(batch_size / 256)
+
+  data = {
+      "constructor": "iodine.modules.data.Dots",
+      "batch_size": batch_size,
+      "path": "multi_object_datasets/6_dots.tfrecords",
+  }
+
+  model = {
+      "constructor": "iodine.modules.iodine.IODINE",
+      "n_z": n_z,
+      "num_components": num_components,
+      "num_iters": num_iters,
+      "iter_loss_weight": "linspace",
+      "coord_type": "cos",
+      "coord_freqs": 3,
+      "decoder": {
+          "constructor": "iodine.modules.decoder.ComponentDecoder",
+          "pixel_decoder": {
+              "constructor": "iodine.modules.networks.BroadcastConv",
+              "cnn_opt": {
+                  # Final channels is irrelevant with target_output_shape
+                  "output_channels": [32, 32, 32, 32, None],
+                  "kernel_shapes": [5],
+                  "strides": [1],
+                  "activation": "elu",
+              },
+              "coord_type": "linear",
+              "coord_freqs": 3,
+          },
+      },
+      "refinement_core": {
+          "constructor": "iodine.modules.refinement.RefinementCore",
+          "encoder_net": {
+              "constructor": "iodine.modules.networks.CNN",
+              "mode": "avg_pool",
+              "cnn_opt": {
+                  "output_channels": [32, 32, 32],
+                  "strides": [2],
+                  "kernel_shapes": [5],
+                  "activation": "elu",
+              },
+              "mlp_opt": {
+                  "output_sizes": [128],
+                  "activation": "elu"
+              },
+          },
+          "recurrent_net": {
+              "constructor": "iodine.modules.networks.LSTM",
+              "hidden_sizes": [],  # No recurrent layer used for this dataset
+          },
+          "refinement_head": {
+              "constructor": "iodine.modules.refinement.ResHead"
+          },
+      },
+      "latent_dist": {
+          "constructor": "iodine.modules.distributions.LocScaleDistribution",
+          "dist": "normal",
+          "scale_act": "softplus",
+          "scale": "var",
+          "name": "latent_dist",
+      },
+      "output_dist": {
+          "constructor": "iodine.modules.distributions.MaskedMixture",
+          "num_components": num_components,
+          "component_dist": {
+              "constructor":
+                  "iodine.modules.distributions.LocScaleDistribution",
+              "dist":
+                  "logistic",
+              "scale":
+                  "fixed",
+              "scale_val":
+                  0.03,
+              "name":
+                  "pixel_distribution",
+          },
+      },
+  }
+
+  optimizer = {
+      "constructor": "tensorflow.train.AdamOptimizer",
+      "learning_rate": {
+          "constructor": "tensorflow.train.exponential_decay",
+          "learning_rate": learn_rate,
+          "global_step": {
+              "constructor": "tensorflow.train.get_or_create_global_step"
+          },
+          "decay_steps": 1000000,
+          "decay_rate": 0.1,
+      },
+      "beta1": 0.95,
+  }

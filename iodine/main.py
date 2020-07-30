@@ -66,6 +66,7 @@ def default_config():
 ex.named_config(configurations.clevr6)
 ex.named_config(configurations.multi_dsprites)
 ex.named_config(configurations.tetrominoes)
+ex.named_config(configurations.dots)
 
 
 @ex.capture
@@ -180,23 +181,19 @@ def main(save_summaries_steps):
   gstep, train_step_exports, train_op = get_train_step(model, dataset,
                                                        optimizer)
 
-  loss, ari = [], []
+  loss = []
   with get_session(checkpoint_dir, train_step_exports["loss/total"]) as sess:
     while not sess.should_stop():
       out = sess.run({
           "step": gstep,
           "loss": train_step_exports["loss/total"],
-          "ari": train_step_exports["loss/ari_nobg"],
           "train": train_op,
       })
       loss.append(out["loss"])
-      ari.append(out["ari"])
       step = out["step"]
       if step % save_summaries_steps == 0:
         mean_loss = np.mean(loss)
-        mean_ari = np.mean(ari)
         ex.log_scalar("loss", mean_loss, step)
-        ex.log_scalar("ari", mean_ari, step)
-        print("{step:>6d} Loss: {loss: >12.2f}\t\tARI-nobg:{ari: >6.2f}".format(
-            step=step, loss=mean_loss, ari=mean_ari))
-        loss, ari = [], []
+        print("{step:>6d} Loss: {loss: >12.2f}".format(
+            step=step, loss=mean_loss))
+        loss = []

@@ -1,4 +1,3 @@
-tensorflow-gpu==1.14.0
 tensorflow-probability==0.7.0
 dm-sonnet==1.35
 sacred>=0.7,<0.8
@@ -6,4 +5,3 @@ shapeguard
 seaborn
 pymongo
 jupyterlab
-git+git://github.com/deepmind/multi_object_datasets.git
